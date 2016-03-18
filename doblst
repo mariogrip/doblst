@@ -1,0 +1,137 @@
+#!/usr/bin/python3
+import sys, json
+import requests as request
+
+#------API key --------
+api = "add you api key here"
+#------------------
+
+
+func = {"new": ["new","n"], "list": ["list","l"], "remove": ["remove", "r"], "attach": ["attach", "a"], "detach": ["detach", "d"]}
+baseUrl = "https://api.digitalocean.com/"
+headers = {"Authorization": "Bearer %s" % api, "Content-Type": "application/json"}
+yes = ['yes','y', 'ye']
+no = ['no','n']
+
+def help():
+    scriptName = sys.argv[0]
+    print("--------- help doblst ---------")
+    print("%s list[l] - lists all your drives" % scriptName)
+    print("%s new[n]  - Create new drive" % scriptName)
+    print("%s remove[r] [drive ID] - Remove drive" % scriptName)
+    print("%s attach[a] [drive ID] [droplet ID] - attach drive to droplet" % scriptName)
+    print("%s detach[d] [drive ID] - detach drive from droplet" % scriptName)
+    sys.exit()
+
+def promptUser(message, exit=True):
+    choice = input(message).lower()
+    if choice in yes:
+        return True
+    elif choice in no:
+        if exit: sys.exit(0)
+        return False
+    else:
+        promptUser("Please respond with 'yes' or 'no'", True)
+
+def finish(response, text, status):
+    if response.status_code == status:
+        if text: print("%s" % (text))
+    else:
+        print("Error: %s" % response.json()["message"])
+        sys.exit()
+
+def postDrives(payload):
+    return request.post("%s/v2/storage/drives" % baseUrl, data=json.dumps(payload), headers=headers)
+
+def deleteDrive(id):
+    return request.delete("%s/v2/storage/drives/%s" % (baseUrl, id), headers=headers)
+
+def postAttatch(id, droplet):
+    return request.post("%s/v2/storage/drives/%s/attachments" % (baseUrl, id), data=json.dumps({"droplet_id": droplet}), headers=headers)
+
+def deleteAttatch(id):
+    return request.delete("%s/v2/storage/drives/%s/attachments" % (baseUrl, id), headers=headers)
+
+def getDrives():
+    return request.get("%s/v2/storage/drives" % baseUrl, headers=headers)
+
+def remove():
+    try:
+        driveId = sys.argv[2]
+    except:
+        help()
+        return
+    promptUser("Are you sure you want to remove this? [y/n]: ")
+    response = deleteDrive(driveId)
+    finish(response, "Successfully deleted drive", 204)
+
+def detach():
+    try:
+        driveId = sys.argv[2]
+    except:
+        help()
+        return
+    promptUser("Are you sure you want to detach? [y/n]: ")
+    response = deleteAttatch(driveId)
+    finish(response, "Successfully deattached drive", 204)
+
+def attach():
+    try:
+        driveId = sys.argv[2]
+        dropletId = sys.argv[3]
+    except:
+        help()
+        return
+    response = postAttatch(driveId, dropletId)
+    finish(response, "Successfully attached drive", 200)
+
+def list():
+    response = getDrives()
+    finish(response, False, 200)
+    num=1
+    drives=response.json()["drives"]
+    for drive in drives:
+        print("--------- Drive %s ---------" % num)
+        print("Name: %s" % drive["name"])
+        print("Description: %s" % drive["description"])
+        print("Size: %sGB" % drive["size_gigabytes"])
+        print("region: %s" % drive["region"]["slug"])
+        print("Ìd: %s" % drive["id"])
+        print("Attached to droplet: %s" % drive["attached_to_droplet_id"])
+        print("")
+        num+=1
+
+def new():
+    print("------ Create new drive ------")
+    name = input("Name: ")
+    description = input("Description: ")
+    size = input("Size in GB [10]: ")
+    size = size or 10
+    region = input("region [nyc1]: ")
+    region = region or "nyc1"
+    payload = {"size_gigabytes": size, "name": name, "description": description, "region": region}
+    print("------- Creating.... --------")
+    response = postDrives(payload)
+    finish(response, "Successfully created drive", 201)
+
+if api == "add you api key here":
+    print("Please add API key first")
+    sys.exit()
+
+try:
+    arg = sys.argv[1]
+except:
+    help()
+
+if arg in func["new"]:
+    new()
+elif arg in func["list"]:
+    list()
+elif arg in func["remove"]:
+    remove()
+elif arg in func["attach"]:
+    attach()
+elif arg in func["detach"]:
+    detach()
+else:
+    help()
