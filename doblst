@@ -83,7 +83,7 @@ def attach():
         help()
         return
     response = postAttatch(driveId, dropletId)
-    finish(response, "Successfully attached drive", 200)
+    finish(response, "Successfully attached drive", 201)
 
 def list():
     response = getDrives()
